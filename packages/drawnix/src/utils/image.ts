@@ -77,6 +77,29 @@ const showCopySuccessToast = (
   });
 };
 
+/**
+ * Injects real hyperlinks into an exported SVG string.
+ *
+ * Board text links are rendered as `<a class="plait-board-link" data-url="...">`
+ * without `href` (clicks are intercepted by the in-app link popup). After
+ * `toSvgData` clones the DOM into the SVG, this post-processing step promotes
+ * `data-url` to a real `href` so the exported file keeps clickable links.
+ */
+export const enrichSvgLinks = (svgData: string): string => {
+  const doc = new DOMParser().parseFromString(svgData, 'image/svg+xml');
+  const links = doc.querySelectorAll<HTMLAnchorElement>('a.plait-board-link[data-url]');
+  links.forEach((link) => {
+    const url = link.getAttribute('data-url')?.trim();
+    if (!url) {
+      return;
+    }
+    link.setAttribute('href', url);
+    link.setAttribute('target', '_blank');
+    link.setAttribute('rel', 'noopener noreferrer');
+  });
+  return new XMLSerializer().serializeToString(doc.documentElement);
+};
+
 const getSvgBlob = async (board: PlaitBoard, isTransparent: boolean, elements?: ExportElements) => {
   const backgroundColor = getBackgroundColor(board) || 'white';
   const fillStyle = isTransparent ? TRANSPARENT : backgroundColor;
@@ -112,8 +135,13 @@ export const saveAsSvg = (board: PlaitBoard) => {
     exportTransparent,
     selectedElements.length > 0 ? selectedElements : undefined
   ).then((blob) => {
-    const imageName = `drawnix-${new Date().getTime()}.svg`;
-    download(blob, imageName);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const svgWithLinks = enrichSvgLinks(reader.result as string);
+      const imageName = `drawnix-${new Date().getTime()}.svg`;
+      download(new Blob([svgWithLinks], { type: CLIPBOARD_MIME_TYPES.svg }), imageName);
+    };
+    reader.readAsText(blob);
   });
 };
 
