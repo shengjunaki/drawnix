@@ -1,11 +1,5 @@
-import {
-  getSelectedElements,
-  PlaitBoard,
-  PlaitElement,
-  toSvgData,
-  toViewBoxPoint,
-} from '@plait/core';
-import { download } from './common';
+import { PlaitBoard, PlaitElement, toSvgData, toViewBoxPoint } from '@plait/core';
+import { download, getExportElements } from './common';
 import { getBackgroundColor } from './color';
 import type { DrawnixBoard } from '../hooks/use-drawnix';
 
@@ -58,9 +52,7 @@ const collectLinkAnnotations = (
   const visited = new Set<HTMLAnchorElement>();
 
   containers.forEach((container) => {
-    const links = container.querySelectorAll<HTMLAnchorElement>(
-      'a.plait-board-link[data-url]'
-    );
+    const links = container.querySelectorAll<HTMLAnchorElement>('a.plait-board-link[data-url]');
     links.forEach((link) => {
       if (visited.has(link)) {
         return;
@@ -124,8 +116,11 @@ export const resolvePageLayout = (
 export const saveAsPdf = async (board: PlaitBoard): Promise<void> => {
   const drawnixBoard = board as DrawnixBoard;
   const exportTransparent = !!drawnixBoard.appState?.exportTransparent;
-  const selectedElements = getSelectedElements(board);
-  const elements = selectedElements.length > 0 ? selectedElements : (board.children as PlaitElement[]);
+  // `undefined` when nothing is selected, so `toSvgData` falls back to its
+  // full recursive element collection. Passing `board.children` here used to
+  // drop mind map subtrees: only the root element's own `<g>` (the central
+  // topic) was cloned because descendants render as sibling `<g>`s.
+  const elements = getExportElements(board);
 
   const svgData = await toSvgData(board, {
     fillStyle: '',
@@ -145,7 +140,7 @@ export const saveAsPdf = async (board: PlaitBoard): Promise<void> => {
     throw new Error('Exported SVG is missing a valid viewBox');
   }
 
-  const annotations = collectLinkAnnotations(board, elements, {
+  const annotations = collectLinkAnnotations(board, elements ?? [], {
     x: viewBoxX,
     y: viewBoxY,
   });

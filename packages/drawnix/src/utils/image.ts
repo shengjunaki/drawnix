@@ -1,5 +1,5 @@
-import { getSelectedElements, PlaitBoard, toSvgData } from '@plait/core';
-import { base64ToBlob, boardToImage, download } from './common';
+import { PlaitBoard, PlaitElement, toSvgData } from '@plait/core';
+import { base64ToBlob, boardToImage, download, getExportElements } from './common';
 import { fileOpen } from '../data/filesystem';
 import { IMAGE_MIME_TYPES } from '../constants';
 import { insertImage } from '../data/image';
@@ -9,7 +9,7 @@ import type { DrawnixBoard } from '../hooks/use-drawnix';
 import { i18nInsidePlaitHook, type Translations } from '../i18n';
 
 type ClipboardImageFormat = 'svg' | 'png';
-type ExportElements = ReturnType<typeof getSelectedElements>;
+type ExportElements = PlaitElement[];
 
 const CLIPBOARD_MIME_TYPES: Record<ClipboardImageFormat, string> = {
   svg: 'image/svg+xml',
@@ -129,12 +129,7 @@ const getImageBlob = async (
 
 export const saveAsSvg = (board: PlaitBoard) => {
   const exportTransparent = !!(board as DrawnixBoard).appState?.exportTransparent;
-  const selectedElements = getSelectedElements(board);
-  return getSvgBlob(
-    board,
-    exportTransparent,
-    selectedElements.length > 0 ? selectedElements : undefined
-  ).then((blob) => {
+  return getSvgBlob(board, exportTransparent, getExportElements(board)).then((blob) => {
     const reader = new FileReader();
     reader.onload = () => {
       const svgWithLinks = enrichSvgLinks(reader.result as string);
@@ -147,12 +142,7 @@ export const saveAsSvg = (board: PlaitBoard) => {
 
 export const saveAsPng = (board: PlaitBoard) => {
   const exportTransparent = !!(board as DrawnixBoard).appState?.exportTransparent;
-  const selectedElements = getSelectedElements(board);
-  getImageBlob(
-    board,
-    exportTransparent,
-    selectedElements.length > 0 ? selectedElements : undefined
-  ).then((imageBlob) => {
+  getImageBlob(board, exportTransparent, getExportElements(board)).then((imageBlob) => {
     if (imageBlob) {
       const ext = 'png';
       const imageName = `drawnix-${new Date().getTime()}.${ext}`;
@@ -163,13 +153,13 @@ export const saveAsPng = (board: PlaitBoard) => {
 
 export const copySelectionAsSvg = async (board: PlaitBoard) => {
   const copyTransparent = !!(board as DrawnixBoard).appState?.copyTransparent;
-  const selectedElements = getSelectedElements(board);
-  if (selectedElements.length === 0) {
+  const elements = getExportElements(board);
+  if (!elements) {
     return;
   }
   const [blob, pngBlob] = await Promise.all([
-    getSvgBlob(board, copyTransparent, selectedElements),
-    getImageBlob(board, copyTransparent, selectedElements),
+    getSvgBlob(board, copyTransparent, elements),
+    getImageBlob(board, copyTransparent, elements),
   ]);
   await writeBlobToClipboard('svg', blob, pngBlob);
   showCopySuccessToast(board, 'svg', copyTransparent);
@@ -177,11 +167,11 @@ export const copySelectionAsSvg = async (board: PlaitBoard) => {
 
 export const copySelectionAsPng = async (board: PlaitBoard) => {
   const copyTransparent = !!(board as DrawnixBoard).appState?.copyTransparent;
-  const selectedElements = getSelectedElements(board);
-  if (selectedElements.length === 0) {
+  const elements = getExportElements(board);
+  if (!elements) {
     return;
   }
-  const imageBlob = await getImageBlob(board, copyTransparent, selectedElements);
+  const imageBlob = await getImageBlob(board, copyTransparent, elements);
   if (!imageBlob) {
     return;
   }
